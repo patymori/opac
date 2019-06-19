@@ -678,39 +678,13 @@ def get_issue_by_url_seg(url_seg, url_seg_issue):
     return Issue.objects.filter(journal=journal, url_segment=url_seg_issue, type__ne='pressrelease').first()
 
 
-def get_issue_info_from_assets_code(assets_code, journal):
-    issue_info = Q(journal=journal)
-    result = re.search('^[v]?(\d+)?([ns])?(\d+|.*)([ns])?(\d+)?', assets_code)
-    if result.group(3) == "ahead":
-        issue_info &= Q(year=int(result.group(1))) & Q(number=result.group(3))
-    else:
-        issue_info &= Q(volume=result.group(1))
-        if result.group(2) == "n":
-            _number = result.group(3) if result.group(3) else None
-            issue_info &= Q(number=_number)
-            if result.group(4) == "s":
-                issue_info &= Q(suppl_text=result.group(5))
-            else:
-                issue_info &= (Q(suppl_text=None) | Q(suppl_text=""))
-        else:
-            issue_info &= Q(number=None)
-            if result.group(2) == "s":
-                issue_info &= Q(suppl_text=result.group(3))
-            else:
-                issue_info &= (Q(suppl_text=None) | Q(suppl_text=""))
-    return issue_info
-
 def get_issue_by_journal_and_assets_code(assets_code, journal):
     if not assets_code:
         raise ValueError(__('Obrigatório um assets_code.'))
 
     if not journal:
         raise ValueError(__('Obrigatório um journal.'))
-    issue = Issue.objects.filter(assets_code=assets_code, journal=journal).first()
-    if not issue:
-        issue_info = get_issue_info_from_assets_code(assets_code, journal)
-        issue = Issue.objects.filter(issue_info).first()
-    return issue
+    return Issue.objects.filter(assets_code=assets_code, journal=journal).first()
 
 
 # -------- ARTICLE --------
@@ -838,6 +812,26 @@ def get_recent_articles_of_issue(issue_iid, is_public=True):
         raise ValueError(__('Parámetro obrigatório: issue_iid.'))
 
     return Article.objects.filter(issue=issue_iid, is_public=is_public).order_by('-order')
+
+
+def get_article_by_pdf_filename(journal_acron, issue_info, pdf_filename):
+    """
+    Retorna dados dos pdfs de um artigo
+    """
+    if not journal_acron:
+        raise ValueError(__('Obrigatório o acrônimo do periódico.'))
+    if not issue_info:
+        raise ValueError(__('Obrigatório o campo issue_info.'))
+    if not pdf_filename:
+        raise ValueError(__('Obrigatório o nome do arquivo PDF.'))
+    pdf_path = "/".join([journal_acron, issue_info, pdf_filename])
+    article = Article.objects.only("pdfs").filter(
+        pdfs__url__endswith=pdf_path, is_public=True).first()
+    if article:
+        for pdf in article.pdfs:
+            if pdf["url"].endswith(pdf_path):
+                return pdf["url"]
+
 
 # -------- NEWS --------
 
