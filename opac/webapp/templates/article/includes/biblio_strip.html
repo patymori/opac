@@ -1,0 +1,16 @@
+{% if section %}
+    <span class="_articleBadge">{{ section }}</span>
+    <span class="_separator"> • </span>
+{% endif %}
+<span class="_editionMeta">{{ biblio_strip }}</span>
+<span class="_separator"> • </span>
+
+{% if doi %}
+    <span class="group-doi">
+        <span class="_doi">{{ doi }}</span>
+            &nbsp;
+        <a class="copyLink" data-clipboard-text="{{ doi }}">
+            <span class="sci-ico-link"></span>COPY
+        </a>
+    </span>
+{% endif %}

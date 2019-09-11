@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import os
 import logging
 import requests
 import mimetypes
@@ -9,10 +10,11 @@ from urllib.parse import urlparse
 from datetime import datetime
 from collections import OrderedDict
 from flask_babelex import gettext as _
-from flask import render_template, abort, current_app, request, session, redirect, jsonify, url_for, Response, send_from_directory, g
+from flask import render_template, abort, current_app, request, session, redirect, jsonify, url_for, Response, send_from_directory, g, Markup
 from werkzeug.contrib.atom import AtomFeed
 from urllib.parse import urljoin
 from legendarium.formatter import descriptive_short_format
+from jinja2 import FileSystemLoader, Environment
 
 from . import main
 from webapp import babel
@@ -893,6 +895,40 @@ def render_html_from_xml(article, lang):
 
 
 def render_html_from_html(article, lang):
+
+    def add_biblio_strip(html, article, lang):
+        # Criamos um objeto do tip soup
+        soup = BeautifulSoup(result.decode('utf8'), 'html.parser')
+
+        context = {
+            "biblio_strip": "Rev. de Saúde Pública 43(2)",
+        }
+        if article.sections:
+            lang_section = list(filter(
+                lambda session: session["language"] == lang,
+                article.sections
+            ))
+            if lang_section:
+                context["section"] = lang_section[0]["name"]
+            else:
+                context["section"] = article.section
+        if article.doi:
+            context["doi"] = "https://doi.org/" + article.doi
+        loader = FileSystemLoader(
+            os.path.join(os.path.dirname(__file__), "../templates/article/includes")
+        )
+        env = Environment(loader=loader)
+        template = env.get_template("biblio_strip.html")
+        soup2 = BeautifulSoup(Markup(template.render(**context)), 'html.parser')
+
+        biblio_strip_tag = soup.new_tag(
+            "div", **{"class": "articleBadge-editionMeta-doi-copyLink"}
+        )
+        biblio_strip_tag.append(soup2)
+        standalone_tag = soup.find('div', {'id': 'standalonearticle'})
+        standalone_tag.div.div.insert(0, biblio_strip_tag)
+        return soup.div
+
     html_url = [html
                 for html in article.htmls
                 if html['lang'] == lang]
@@ -904,7 +940,8 @@ def render_html_from_html(article, lang):
 
     result = fetch_data(normalize_ssm_url(html_url))
 
-    html = result.decode('utf8')
+    # html = result.decode('utf8')
+    html = add_biblio_strip(result, article, lang)
 
     text_languages = [html['lang'] for html in article.htmls]
 
